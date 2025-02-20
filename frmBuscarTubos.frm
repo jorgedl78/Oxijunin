@@ -334,7 +334,7 @@ Private Sub BuscarTubosParaVender()
                         & " UnidadesMedidas ON Tubos.idUnidadMedida = UnidadesMedidas.idUnidadMedida AND Tubos.idUnidadMedida = UnidadesMedidas.idUnidadMedida AND " _
                         & " Tubos.idUnidadMedida = UnidadesMedidas.idUnidadMedida AND Tubos.idUnidadMedida = UnidadesMedidas.idUnidadMedida AND " _
                         & " Tubos.idUnidadMedida = UnidadesMedidas.idUnidadMedida " _
-                        & " WHERE (Tubos.Numero like '" & txtBusca & "%') AND ((Tubos.idEstadoTubos = 4) OR (Tubos.idEstadoTubos = 13)) " _
+                        & " WHERE (Tubos.Numero like '" & txtBusca & "%') AND ((Tubos.idEstadoTubos = 4) OR (Tubos.idEstadoTubos = 13)) AND Inactivo = 0 " _
                         & " ORDER BY Tubos.Numero")
     
     txtEncontrados = rs.RecordCount

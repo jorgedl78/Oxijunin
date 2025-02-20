@@ -228,6 +228,8 @@ Private Sub cmdGuardar_Click()
     If cmUnidad.ListIndex < 0 Then MsgBox ("Debe definir la Unidad de Medida"): Exit Sub
     If IsNumeric(txtCapacidad) = False Then MsgBox ("El capacidad no es un valor válido"): Exit Sub
     If IsNumeric(txtCodigoPropietario) = False Then MsgBox ("El código del propietario es inválido"): Exit Sub
+    
+   
     Respuesta = MsgBox("¿Esta seguro de guardar el Tubo?", vbYesNo, "Guardar")
     If Respuesta = vbNo Then Exit Sub
     cn.Open
@@ -248,7 +250,15 @@ Private Sub cmdGuardar_Click()
             cn.Execute ("INSERT INTO MovimientosTubos (Fecha, Detalle, idTubo) VALUES ('" & Format(Date, "dd/mm/yyyy") & "', '" & cmMovimientos.Text & ": Movimiento manual'," & idTubo & ")")
         End If
     Else
-        cn.Execute ("INSERT INTO Tubos (Numero, Capacidad, idEstadoTubos, idArticulo, idUnidadMedida, ClienteActual, Propietario, UltimoMovimiento, DetalleUltimo ) VALUES ('" & txtNumero & "', " & Replace(txtCapacidad, ",", ".") & " , " & cmMovimientos.ItemData(cmMovimientos.ListIndex) & ", " & cmGas.ItemData(cmGas.ListIndex) & ", " & cmUnidad.ItemData(cmUnidad.ListIndex) & ", " & EnDestino & "," & txtCodigoPropietario & ", '" & Format(Date, "dd/mm/yyyy") & "','Movimiento Manual')")
+        Set rs = cn.Execute("SELECT count(idTubo) as Cuantos FROM Tubos WHERE Numero = '" & txtNumero & "'")
+        If rs!Cuantos > 0 Then
+            MsgBox ("No se puede agregar. Este número de tubo ya existe en el sistema")
+            Set rs = Nothing
+            cn.Close
+            Exit Sub
+        End If
+
+        cn.Execute ("INSERT INTO Tubos (Numero, Capacidad, idEstadoTubos, idArticulo, idUnidadMedida, ClienteActual, Propietario, UltimoMovimiento, DetalleUltimo, Inactivo ) VALUES ('" & txtNumero & "', " & Replace(txtCapacidad, ",", ".") & " , " & cmMovimientos.ItemData(cmMovimientos.ListIndex) & ", " & cmGas.ItemData(cmGas.ListIndex) & ", " & cmUnidad.ItemData(cmUnidad.ListIndex) & ", " & EnDestino & "," & txtCodigoPropietario & ", '" & Format(Date, "dd/mm/yyyy") & "','Movimiento Manual', 0)")
         Set rs = cn.Execute("SELECT max(idTubo) as UltimoId from Tubos")
         UltimoId = rs!UltimoId
         cn.Execute ("INSERT INTO MovimientosTubos (Fecha, Detalle, idTubo) VALUES ('" & Format(Date, "dd/mm/yyyy") & "', '" & cmMovimientos.Text & ": Movimiento manual'," & UltimoId & ")")
@@ -292,9 +302,9 @@ Private Sub Form_Load()
         txtNumero = ""
         txtCapacidad = ""
         cmGas.ListIndex = 0
-        For I = 0 To cmMovimientos.ListCount - 1
-            If cmMovimientos.ItemData(I) = 16 Then cmMovimientos.ListIndex = I
-        Next I
+        For i = 0 To cmMovimientos.ListCount - 1
+            If cmMovimientos.ItemData(i) = 16 Then cmMovimientos.ListIndex = i
+        Next i
         cmMovimientos.Enabled = False
         cmUnidad.ListIndex = 0
         chkEtiquetar = 1
@@ -306,15 +316,15 @@ Private Sub Form_Load()
             txtidTubo = rs!idTubo
             txtNumero = rs!numero
             txtCapacidad = Format(rs!Capacidad, "0.00")
-            For I = 0 To cmGas.ListCount - 1
-                If cmGas.ItemData(I) = rs!idArticulo Then cmGas.ListIndex = I
-            Next I
-            For I = 0 To cmMovimientos.ListCount - 1
-                If cmMovimientos.ItemData(I) = rs!idEstadoTubos Then cmMovimientos.ListIndex = I
-            Next I
-            For I = 0 To cmUnidad.ListCount - 1
-                If cmUnidad.ItemData(I) = rs!idUnidadMedida Then cmUnidad.ListIndex = I
-            Next I
+            For i = 0 To cmGas.ListCount - 1
+                If cmGas.ItemData(i) = rs!idArticulo Then cmGas.ListIndex = i
+            Next i
+            For i = 0 To cmMovimientos.ListCount - 1
+                If cmMovimientos.ItemData(i) = rs!idEstadoTubos Then cmMovimientos.ListIndex = i
+            Next i
+            For i = 0 To cmUnidad.ListCount - 1
+                If cmUnidad.ItemData(i) = rs!idUnidadMedida Then cmUnidad.ListIndex = i
+            Next i
             txtCodigoPropietario = rs!Propietario
             txtPropietario = rs!NombrePropietario
             idEstadoActual = rs!idEstadoTubos

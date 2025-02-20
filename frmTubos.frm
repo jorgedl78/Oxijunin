@@ -10,11 +10,22 @@ Begin VB.Form frmTubos
    ScaleHeight     =   8400
    ScaleWidth      =   13035
    StartUpPosition =   2  'CenterScreen
+   Begin VB.CommandButton cmdQuitar 
+      Caption         =   "Ocultar"
+      Height          =   1095
+      Left            =   8880
+      Picture         =   "frmTubos.frx":0000
+      Style           =   1  'Graphical
+      TabIndex        =   10
+      Tag             =   "Esta acciòn inactiva al tubo y ya no queda visible"
+      Top             =   6960
+      Width           =   1215
+   End
    Begin VB.CommandButton cmdVerMovimientos 
       Caption         =   "Movimientos"
       Height          =   1095
       Left            =   3240
-      Picture         =   "frmTubos.frx":0000
+      Picture         =   "frmTubos.frx":0115
       Style           =   1  'Graphical
       TabIndex        =   9
       Top             =   6960
@@ -24,7 +35,7 @@ Begin VB.Form frmTubos
       Caption         =   "Remitos de Tubos"
       Height          =   1095
       Left            =   4920
-      Picture         =   "frmTubos.frx":08CA
+      Picture         =   "frmTubos.frx":09DF
       Style           =   1  'Graphical
       TabIndex        =   8
       Top             =   6960
@@ -33,8 +44,8 @@ Begin VB.Form frmTubos
    Begin VB.CommandButton cmdSalir 
       Caption         =   "Salir"
       Height          =   1095
-      Left            =   9360
-      Picture         =   "frmTubos.frx":0C2B
+      Left            =   11040
+      Picture         =   "frmTubos.frx":0D40
       Style           =   1  'Graphical
       TabIndex        =   3
       Top             =   6960
@@ -51,7 +62,7 @@ Begin VB.Form frmTubos
       Caption         =   "Agregar"
       Height          =   1095
       Left            =   7440
-      Picture         =   "frmTubos.frx":14F5
+      Picture         =   "frmTubos.frx":160A
       Style           =   1  'Graphical
       TabIndex        =   1
       Top             =   6960
@@ -131,6 +142,17 @@ Private Sub cmdAgregar_Click()
     frmFichaTubo.Show 1
 End Sub
 
+Private Sub cmdQuitar_Click()
+    If grTubos.Rows <= 1 Then Exit Sub
+    Respuesta = MsgBox("¿Confirma la ocultación del tubo " & grTubos.TextMatrix(grTubos.Row, 1) & "?", vbYesNo, "Atencion!")
+    If Respuesta = vbNo Then Exit Sub
+    
+    cn.Open
+    Set rs = cn.Execute("UPDATE Tubos SET Inactivo = 1 WHERE idTubo = " & grTubos.TextMatrix(grTubos.Row, 0))
+    cn.Close
+    BuscarTubos
+End Sub
+
 Private Sub cmdRemitosTubos_Click()
     frmRemitosTubos.Show 1
 End Sub
@@ -205,7 +227,7 @@ Sub BuscarTubos()
     cn.Open
     Dim rs As ADODB.Recordset
 
-    Set rs = cn.Execute("SELECT Tubos.idTubo, Tubos.Numero, Articulos.Descripcion, Tubos.Capacidad, UnidadesMedidas.Unidad, EstadoTubos.Movimiento, EstadoTubos.Estado, clientes.idCliente, clientes.Nombre FROM Articulos INNER JOIN Tubos ON Articulos.idArticulo = Tubos.idArticulo INNER JOIN UnidadesMedidas ON Tubos.idUnidadMedida = UnidadesMedidas.idUnidadMedida INNER JOIN EstadoTubos ON Tubos.idEstadoTubos = EstadoTubos.idEstadoTubos inner join Clientes on clientes.idCliente=tubos.ClienteActual  where Numero like '%" & txtBusca & "%' order by Numero")
+    Set rs = cn.Execute("SELECT Tubos.idTubo, Tubos.Numero, Articulos.Descripcion, Tubos.Capacidad, UnidadesMedidas.Unidad, EstadoTubos.Movimiento, EstadoTubos.Estado, clientes.idCliente, clientes.Nombre FROM Articulos INNER JOIN Tubos ON Articulos.idArticulo = Tubos.idArticulo INNER JOIN UnidadesMedidas ON Tubos.idUnidadMedida = UnidadesMedidas.idUnidadMedida INNER JOIN EstadoTubos ON Tubos.idEstadoTubos = EstadoTubos.idEstadoTubos inner join Clientes on clientes.idCliente=tubos.ClienteActual  where Inactivo = 0 AND Numero like '%" & txtBusca & "%' order by Numero")
     lblEncontrados = rs.RecordCount
    ' Set grArticulos.DataSource = rs
     With grTubos
