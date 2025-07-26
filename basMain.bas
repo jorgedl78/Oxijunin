@@ -1,5 +1,6 @@
 Attribute VB_Name = "Module1"
-Public cn As ADODB.Connection
+'Public cn As ADODB.Connection
+Public cn As Object
 Public cnDataShape As ADODB.Connection
 Public idUsuario As Integer
 Public Usuario As String
@@ -53,6 +54,8 @@ Sub Main()
     '   MsgBox ("La configuracion regional no es la recomendada" & Chr(13) & "Debe configurar el punto para separador decimal y la coma para separador de miles"): Exit Sub
     'End If
     
+ 
+    
     Dim i As Integer
     Dim Est As String
     On Error GoTo noInicia
@@ -61,7 +64,7 @@ Sub Main()
     srv = Mid(Est, 1, Len(Trim(Est)) - 1)
     Est = String$(50, " ")
     i = GetPrivateProfileString("Config", "db", "", Est, Len(Est), "./config.ini")
-    db = Mid(Est, 1, Len(Trim(Est)) - 1)
+    Db = Mid(Est, 1, Len(Trim(Est)) - 1)
     Est = String$(50, " ")
     i = GetPrivateProfileString("Config", "us", "", Est, Len(Est), "./config.ini")
     us = Mid(Est, 1, Len(Trim(Est)) - 1)
@@ -74,27 +77,49 @@ Sub Main()
     Est = String$(50, " ")
     i = GetPrivateProfileString("Config", "portfiscal", "", Est, Len(Est), "./config.ini")
     portfiscal = Mid(Est, 1, Len(Trim(Est)) - 1)
+    Est = String$(200, " ")
+    i = GetPrivateProfileString("Config", "cadenaConexion", "", Est, Len(Est), "./config.ini")
+    cadenaConexion = Mid(Est, 1, Len(Trim(Est)) - 1)
 
-    
+    'MsgBox (cadenaConexion)
     'para escribir ini
     'Dim I As Integer
     'Dim Est As String
     'Est = "Ejemplo - Apartado"
     'I = WritePrivateProfileString("Ejemplo", "Nombre", Est, "Ejemplo.ini")
     
-    Set cn = New ADODB.Connection
+    'Set cn = New ADODB.Connection
+    Set cn = CreateObject("ADODB.Connection")
     cn.CursorLocation = adUseClient
     
     'esta cadena es para conectar a sqlserver2000
     'cn.ConnectionString = "Provider=SQLOLEDB.1;Persist Security Info=False;User ID=sa;Pwd=soloitenet;Initial Catalog=Ejemplo;Data Source=JDL\EXPRESS"
     'esta cadena es para sqlserver2008Express
-    cn.ConnectionString = "Provider=SQLNCLI10;Data Source=" & srv & ";Persist Security info=True;Initial Catalog=" & db & ";User ID=" & us & ";Password=" & pw
-    
-   
+    cn.ConnectionString = "Provider=SQLNCLI10;Data Source=" & srv & ";Persist Security info=True;Initial Catalog=" & Db & ";User ID=" & us & ";Password=" & pw
+
+    'cn.ConnectionString = cadenaConexion
+
     frmLoguin.Show
     Exit Sub
     
 noInicia:
+
+    fd = FreeFile
+    Open ".txt" For Append As fd
+            Print #fd, "-----------------------------------------------"
+            Print #fd, Date & " " & Time
+            Print #fd, "Error: " & Err.Number & " - " & Err.Description
+    Close fd
+    
+    Dim Archivo As Integer
+    Dim Ruta As String
+    Ruta = App.Path & "\ErroresLog.txt" ' Guardará el log en la carpeta del programa
+    
+    Archivo = FreeFile() ' Obtiene un número de archivo libre
+    Open Ruta For Append As #Archivo ' Abre el archivo para agregar texto
+        Print #Archivo, Date & " " & Time & " - Error " & Err.Number & " - " & Err.Description
+    Close #Archivo ' Cierra el archivo para guardar cambios
+
     MsgBox ("Error de configuración" & Chr(13) & "No se puede iniciar la aplicación")
     Exit Sub
 End Sub
@@ -358,7 +383,7 @@ Public Function EncodeBase64(ByVal strData As String) As Byte()
     Set objXML = CreateObject("MSXML2.DOMDocument")
     Set objNode = objXML.createElement("b64")
  
-    objNode.dataType = "bin.base64"
+    objNode.DataType = "bin.base64"
     objNode.nodeTypedValue = bArray
     EnecodeBase64 = objNode.Text
     codigo_QR64 = EnecodeBase64

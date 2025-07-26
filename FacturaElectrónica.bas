@@ -1,7 +1,10 @@
 Attribute VB_Name = "FacturaElectrónica"
-Public Function FacturaElectronica(TipoComprobante As String, Letra As String, TipoDocumento As String, CuitCliente As String, Neto As Double, NetoMitad As Double, Iva As Double, IvaMitad As Double, Total As Double, Impuesto As Double)
+Public Function FacturaElectronica(TipoComprobante As String, Letra As String, TipoDocumento As String, CuitCliente As String, Neto As Double, NetoMitad As Double, Iva As Double, IvaMitad As Double, Total As Double, Impuesto As Double, categoriaIvaReceptor As String)
     Dim WSAA As Object, WSFEv1 As Object
     Dim rs As ADODB.Recordset
+    
+    
+    
     On Error GoTo ManejoError
     CAE = ""
     VencimientoCAE = ""
@@ -18,6 +21,17 @@ Public Function FacturaElectronica(TipoComprobante As String, Letra As String, T
         If Letra = "B" Then tipo_cbte = 7
     End If
     
+    Select Case categoriaIvaReceptor
+        Case "Consumidor Final"
+            condicionIvaReceptor = 5
+        Case "Responsable Inscripto"
+            condicionIvaReceptor = 1
+        Case "Exento"
+            condicionIvaReceptor = 4
+        Case "Monotributo"
+            condicionIvaReceptor = 6
+    End Select
+    
     ' Crear objeto interface Web Service Autenticación y Autorización
     Set WSAA = CreateObject("WSAA")
     Debug.Print WSAA.Version
@@ -29,63 +43,6 @@ Public Function FacturaElectronica(TipoComprobante As String, Letra As String, T
     ' deshabilito errores no manejados (version 2.04 o superior)
     WSAA.LanzarExcepciones = False
         
-    ' Generar un Ticket de Requerimiento de Acceso (TRA) para WSFEv1
-    ttl = 36000 ' tiempo de vida = 10hs hasta expiración
-    tra = WSAA.CreateTRA("wsfe", ttl)
-    ControlarExcepcion WSAA
-    Debug.Print tra
-    
-    ' Especificar la ubicacion de los archivos certificado y clave privada
-    'Path = WSAA.InstallDir + "\"    ' el directorio de instalacion
-    'Path = CurDir() + "\" 'para ruta actual, usar CurDir()
-    ' Certificado: certificado es el firmado por la AFIP
-    ' ClavePrivada: la clave privada usada para crear el certificado
-    'Certificado = "20262803776ItenetTesting.crt" ' certificado de prueba
-    'ClavePrivada = "20262803776ItenetTesting.key" ' clave privada de prueba
-    
-    cn.Open
-    Set rs = cn.Execute("SELECT PuestoElectronico, Certificado, Clave, Cuit, ModoTesting FROM Parametros")
-    punto_vta = rs!PuestoElectronico
-    Certificado = rs!Certificado
-    ClavePrivada = rs!Clave
-    Cuit = rs!Cuit
-    ModoTesting = rs!ModoTesting
-    cn.Close
-    
-    ' Generar el mensaje firmado (CMS)
-    'cms = WSAA.SignTRA(tra, Path + Certificado, Path + ClavePrivada)
-    cms = WSAA.SignTRA(tra, Certificado, ClavePrivada)
-    ControlarExcepcion WSAA
-    Debug.Print cms
-    
-    ' Conectarse con el webservice de autenticación:
-    cache = ""
-    proxy = "" '"usuario:clave@localhost:8000"
-    wrapper = "" ' libreria http (httplib2, urllib2, pycurl)
-    cacert = WSAA.InstallDir & "\conf\afip_ca_info.crt" ' certificado de la autoridad de certificante
-    If ModoTesting = 1 Then
-        wsdl = "https://wsaahomo.afip.gov.ar/ws/services/LoginCms?wsdl"
-        ok = WSAA.Conectar(cache, wsdl, proxy, wrapper, cacert) ' Homologación
-    Else
-        wsdl = "https://wsaa.afip.gov.ar/ws/services/LoginCms?wsdl"
-        ok = WSAA.Conectar(cache, wsdl, proxy, wrapper, cacert) ' Produccion
-    End If
-        
-    ControlarExcepcion WSAA
-    
-    ' Llamar al web service para autenticar:
-    ta = WSAA.LoginCMS(cms)
-    ControlarExcepcion WSAA
-
-    ' Imprimir el ticket de acceso, ToKen y Sign de autorización
-    Debug.Print ta
-    Debug.Print "Token:", WSAA.Token
-    Debug.Print "Sign:", WSAA.Sign
-    
-    ' Una vez obtenido, se puede usar el mismo token y sign por 10 horas
-    ' (este período se puede cambiar)
-    ' revisar WSAA.Expirado() y en dicho caso tramitar nuevo TA
-    
     ' Crear objeto interface Web Service de Factura Electrónica de Mercado Interno
     Set WSFEv1 = CreateObject("WSFEv1")
     Debug.Print WSFEv1.Version
@@ -93,12 +50,79 @@ Public Function FacturaElectronica(TipoComprobante As String, Letra As String, T
         MsgBox "Debe instalar una versión mas actualizada de PyAfipWs WSFEv1!"
         End
     End If
-    'Debug.Print WSFEv1.InstallDir
     
-    ' Setear tocken y sing de autorización (pasos previos)
-    WSFEv1.Token = WSAA.Token
-    WSFEv1.Sign = WSAA.Sign
     
+    cn.Open
+    Set rs = cn.Execute("SELECT PuestoElectronico, Certificado, Clave, Cuit, ModoTesting, token, Sign, FechaExpiracion FROM Parametros")
+    punto_vta = rs!PuestoElectronico
+    Certificado = rs!Certificado
+    ClavePrivada = rs!Clave
+    Cuit = rs!Cuit
+    ModoTesting = rs!ModoTesting
+    
+    If Now < rs!FechaExpiracion Then
+        ' TA vigente - reutilizo
+        WSFEv1.token = CStr(rs!token)
+        WSFEv1.Sign = CStr(rs!Sign)
+    Else
+         ' Generar un Ticket de Requerimiento de Acceso (TRA) para WSFEv1
+        ttl = 36000 ' tiempo de vida = 10hs hasta expiración
+        tra = WSAA.CreateTRA("wsfe", ttl)
+        ControlarExcepcion WSAA
+        Debug.Print tra
+        
+        ' Generar el mensaje firmado (CMS)
+        cms = WSAA.SignTRA(tra, Certificado, ClavePrivada)
+        ControlarExcepcion WSAA
+        Debug.Print cms
+        
+        ' Conectarse con el webservice de autenticación:
+        cache = ""
+        proxy = "" '"usuario:clave@localhost:8000"
+        wrapper = "" ' libreria http (httplib2, urllib2, pycurl)
+        cacert = WSAA.InstallDir & "\conf\afip_ca_info.crt" ' certificado de la autoridad de certificante
+        If ModoTesting = 1 Then
+            wsdl = "https://wsaahomo.afip.gov.ar/ws/services/LoginCms?wsdl"
+            ok = WSAA.Conectar(cache, wsdl, proxy, wrapper, cacert) ' Homologación
+        Else
+            wsdl = "https://wsaa.afip.gov.ar/ws/services/LoginCms?wsdl"
+            ok = WSAA.Conectar(cache, wsdl, proxy, wrapper, cacert) ' Produccion
+        End If
+            
+        ControlarExcepcion WSAA
+        
+        ' Llamar al web service para autenticar:
+        ta = WSAA.LoginCMS(cms)
+        
+        
+        Debug.Print "Token directo:", WSAA.token
+        Debug.Print "Sign directo:", WSAA.Sign
+        
+         ' Guardo nuevo Token, Sign y expiración en la base
+        token = WSAA.token
+        Sign = WSAA.Sign
+        cn.Execute "UPDATE Parametros SET Token='" & token & "', Sign='" & Sign & "', FechaExpiracion='" & DateAdd("h", 10, Now) & "'"
+        
+        ControlarExcepcion WSAA
+    
+        ' Setear tocken y sing de autorización (pasos previos)
+        WSFEv1.token = WSAA.token
+        WSFEv1.Sign = WSAA.Sign
+
+    
+        ' Imprimir el ticket de acceso, ToKen y Sign de autorización
+        Debug.Print ta
+        Debug.Print "Token:", WSAA.token
+        Debug.Print "Sign:", WSAA.Sign
+    End If
+    
+    Set rs = Nothing
+    cn.Close
+   ' Set cn = Nothing
+    ' Una vez obtenido, se puede usar el mismo token y sign por 10 horas
+    ' (este período se puede cambiar)
+    ' revisar WSAA.Expirado() y en dicho caso tramitar nuevo TA
+     
     ' CUIT del emisor (debe estar registrado en la AFIP)
     WSFEv1.Cuit = Cuit
     
@@ -130,12 +154,8 @@ Public Function FacturaElectronica(TipoComprobante As String, Letra As String, T
     Debug.Print "dbserver status", WSFEv1.DbServerStatus
     Debug.Print "authserver status", WSFEv1.AuthServerStatus
        
-    ' Establezco los valores de la factura a autorizar:
-    'tipo_cbte = 6
-    'punto_vta = 4004
-
     cbte_nro = WSFEv1.CompUltimoAutorizado(tipo_cbte, punto_vta)
-
+    Debug.Print "Ultimo cte autorizado: ", cbte_nro
 
     ControlarExcepcion WSFEv1
     For Each v In WSFEv1.errores
@@ -194,7 +214,7 @@ Public Function FacturaElectronica(TipoComprobante As String, Letra As String, T
     End If
         
     ' Agrego impuestos varios
-    id = 99
+    ID = 99
     Desc = "Impuesto Municipal Matanza'"
     base_imp = "100.00"
     alic = "0.10"
@@ -202,7 +222,7 @@ Public Function FacturaElectronica(TipoComprobante As String, Letra As String, T
     'ok = WSFEv1.AgregarTributo(id, Desc, base_imp, alic, importe)
 
     ' Agrego impuestos varios
-    id = 4
+    ID = 4
     Desc = "Impuestos internos"
     base_imp = "100.00"
     alic = "0.40"
@@ -210,7 +230,7 @@ Public Function FacturaElectronica(TipoComprobante As String, Letra As String, T
     'ok = WSFEv1.AgregarTributo(id, Desc, base_imp, alic, importe)
 
     ' Agrego impuestos varios
-    id = 1
+    ID = 1
     Desc = "Impuesto nacional"
     base_imp = "50.00"
     alic = "1.00"
@@ -219,27 +239,27 @@ Public Function FacturaElectronica(TipoComprobante As String, Letra As String, T
 
     ' Agrego tasas de IVA
     If Iva = "0" And IvaMitad = 0 Then
-        id = 3 'comprobante sin iva
+        ID = 3 'comprobante sin iva
         base_imp = Neto
         Importe = 0
-        ok = WSFEv1.AgregarIva(id, base_imp, Importe)
+        ok = WSFEv1.AgregarIva(ID, base_imp, Importe)
     End If
     If Iva <> 0 Then
-        id = 5 ' 21%
+        ID = 5 ' 21%
         base_imp = Replace(Format(Neto, "0.00"), ",", ".")
         Importe = Replace(Format(Iva, "0.00"), ",", ".")
-        ok = WSFEv1.AgregarIva(id, base_imp, Importe)
+        ok = WSFEv1.AgregarIva(ID, base_imp, Importe)
     End If
     
     If IvaMitad <> 0 Then
-        id = 4 ' 10.5%
+        ID = 4 ' 10.5%
         base_imp = Replace(Format(NetoMitad, "0.00"), ",", ".")
         Importe = Replace(Format(IvaMitad, "0.00"), ",", ".")
-        ok = WSFEv1.AgregarIva(id, base_imp, Importe)
+        ok = WSFEv1.AgregarIva(ID, base_imp, Importe)
     End If
     
     ' Agrego tasas de IVA al 0% (imp_tot_conc, solo para pruebas)
-    id = 4 ' 10.5%
+    ID = 4 ' 10.5%
     base_imp = "50.00"
     Importe = "5.25"
     'ok = WSFEv1.AgregarIva(id, base_imp, importe)
@@ -252,12 +272,36 @@ Public Function FacturaElectronica(TipoComprobante As String, Letra As String, T
         'ok = WSFEv1.AgregarOpcional(7, "01")             ' Car?er del Firmante (01: Titular, 02: Director/Presidente, 03: Apoderado, 04: Empleado)
     End If
     
+    ok = WSFEv1.EstablecerCampoFactura("cancela_misma_moneda_ext", "N")
+    ok = WSFEv1.EstablecerCampoFactura("condicion_iva_receptor_id", condicionIvaReceptor)
+    
+    
+    
     ' Habilito reprocesamiento automático (predeterminado):
     WSFEv1.Reprocesar = True
+    
+    
+    Debug.Print "Token Length: " & Len(token)
+    Debug.Print "Token First Line: " & Left(token, 200)
+    Debug.Print "Sign Length: " & Len(Sign)
+    Debug.Print "Sign: " & Sign
 
     ' Solicito CAE:
     CAE = WSFEv1.CAESolicitar()
     ControlarExcepcion WSFEv1
+
+    If WSFEv1.Resultado <> "A" Then
+        Dim mensajeWS As String
+        ok = WSFEv1.AnalizarXml("XmlResponse")
+        mensajeWS = WSFEv1.ObtenerTagXml("Msg")
+        If mensajeWS <> "" Then
+            MsgBox "Comprobante RECHAZADO." & vbCrLf & _
+           "Motivo(s): " & vbCrLf & mensajeWS, _
+           vbCritical + vbOKOnly, "? RECHAZADO"
+        End If
+        Exit Function
+    End If
+    
     VencimientoCAE = WSFEv1.Vencimiento
     
     
@@ -281,7 +325,7 @@ Public Function FacturaElectronica(TipoComprobante As String, Letra As String, T
     
     ' Muestro los errores
     If WSFEv1.errmsg <> "" Then
-        'MsgBox WSFEv1.errmsg, vbExclamation, "Error"
+        MsgBox WSFEv1.errmsg, vbExclamation, "Error"
     End If
     
     ' Muestro los eventos (mantenimiento programados y otros mensajes de la AFIP)
@@ -319,7 +363,23 @@ Public Function FacturaElectronica(TipoComprobante As String, Letra As String, T
             Debug.Print "Segundo Tributo (importe):", WSFEv1.ObtenerTagXml("Tributos", "Tributo", 1, "Importe")
             Debug.Print "Tercer Tributo (ds):", WSFEv1.ObtenerTagXml("Tributos", "Tributo", 2, "Desc")
             Debug.Print "Tercer Tributo (importe):", WSFEv1.ObtenerTagXml("Tributos", "Tributo", 2, "Importe")
+            Debug.Print "Observaciones:", WSFEv1.ObtenerTagXml("Msg")
+            Dim mensajeObservaciones As Variant
+            mensajeObservaciones = WSFEv1.ObtenerTagXml("Msg")
+            
+            'MsgBox (mensajeObservaciones)
+
+                       
+            If IsNull(mensajeObservaciones) Or mensajeObservaciones = "" Then
+                MsgBox "AUTORIZADO", _
+                       vbInformation + vbOKOnly, "? AUTORIZADO"
+            Else
+                MsgBox "AUTORIZADO." & vbCrLf & _
+                       "Observaciones: " & vbCrLf & WSFEv1.ObtenerTagXml("Msg"), _
+                       vbInformation + vbOKOnly, "AUTORIZADO CON OBSERVACIONES"
+            End If
         Else
+        
             ' hubo error, muestro mensaje
             Debug.Print WSFEv1.Excepcion
         End If
@@ -346,7 +406,9 @@ ManejoError:
             Print #fd, Date & " " & Time
             Print #fd, WSAA.Excepcion
             Print #fd, WSAA.Traceback
+            Print #fd, "----Request----"
             Print #fd, WSAA.XmlRequest
+            Print #fd, "----Response----"
             Print #fd, WSAA.XmlResponse
             ' guardo mensaje de error para mostrarlo:
             Excepcion = WSAA.Excepcion
@@ -358,7 +420,9 @@ ManejoError:
             Print #fd, Date & " " & Time
             Print #fd, WSFEv1.Excepcion
             Print #fd, WSFEv1.Traceback
+            Print #fd, "----Request----"
             Print #fd, WSFEv1.XmlRequest
+            Print #fd, "----Request----"
             Print #fd, WSFEv1.XmlResponse
             Print #fd, WSFEv1.DebugLog()
             ' guardo mensaje de error para mostrarlo:
@@ -468,7 +532,7 @@ Public Function ConsultaUltimoComprobante(TipoComprobante As String, Letra As St
 
     ' Imprimir el ticket de acceso, ToKen y Sign de autorización
     Debug.Print ta
-    Debug.Print "Token:", WSAA.Token
+    Debug.Print "Token:", WSAA.token
     Debug.Print "Sign:", WSAA.Sign
     
     ' Una vez obtenido, se puede usar el mismo token y sign por 10 horas
@@ -485,7 +549,7 @@ Public Function ConsultaUltimoComprobante(TipoComprobante As String, Letra As St
     'Debug.Print WSFEv1.InstallDir
     
     ' Setear tocken y sing de autorización (pasos previos)
-    WSFEv1.Token = WSAA.Token
+    WSFEv1.token = WSAA.token
     WSFEv1.Sign = WSAA.Sign
     
     ' CUIT del emisor (debe estar registrado en la AFIP)

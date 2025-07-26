@@ -1,5 +1,5 @@
 VERSION 5.00
-Object = "{9C5C9460-5789-11DA-8CFB-0000E856BC17}#1.0#0"; "Fiscal051122.ocx"
+Object = "{9C5C9460-5789-11DA-8CFB-0000E856BC17}#1.0#0"; "Fiscal051122.Ocx"
 Object = "{0ECD9B60-23AA-11D0-B351-00A0C9055D8E}#6.0#0"; "MSHFLXGD.OCX"
 Object = "{648A5603-2C6E-101B-82B6-000000000014}#1.1#0"; "MSCOMM32.OCX"
 Object = "{86CF1D34-0C5F-11D2-A9FC-0000F8754DA1}#2.0#0"; "MSCOMCT2.OCX"
@@ -425,7 +425,7 @@ Begin VB.Form frmFacturador
       _ExtentY        =   661
       _Version        =   393216
       Enabled         =   0   'False
-      Format          =   91947009
+      Format          =   40173569
       CurrentDate     =   42366
    End
    Begin VB.Frame frComprobante 
@@ -756,7 +756,7 @@ Begin VB.Form frmFacturador
       _ExtentY        =   661
       _Version        =   393216
       Enabled         =   0   'False
-      Format          =   91947009
+      Format          =   40173569
       CurrentDate     =   42366
    End
    Begin MSFlexGridLib.MSFlexGrid grDetalleTubos 
@@ -1837,7 +1837,7 @@ Private Sub cmdAceptar_Click()
         Letra = lblLetra
         
         If chkElectronica.Value = 1 Then
-            a = FacturaElectronica(TipoComprobante, lblLetra, lblTipoDocumento, lblNumeroDocumento, NetoAcumulado, NetoAcumuladoMitad, txtIva, texIvaMitad, txtTotal, txtImpuestos)
+            a = FacturaElectronica(TipoComprobante, lblLetra, lblTipoDocumento, lblNumeroDocumento, NetoAcumulado, NetoAcumuladoMitad, txtIva, texIvaMitad, txtTotal, txtImpuestos, lblCategoria)
             If CAE = "" Then Exit Sub
             NumeroComprobante = cbte_nro
             PuestoFiscal = punto_vta
